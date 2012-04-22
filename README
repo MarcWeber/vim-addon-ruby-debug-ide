@@ -1,0 +1,61 @@
+Implement ruby-debug-ide client for Vim.
+
+status: This is working:
+- stepping
+- breakpoints
+- var view and more stuff coming soon (help welcome)
+
+USAGE:
+  ! Requires client-server, thus X or patched Vim (eg nox patch, see vim-addon-async)
+
+  1)
+  get this ruby-debug-ide19 code, branch json: 
+    https://github.com/MarcWeber/vim-addon-ruby-debug-ide
+  make ruby find it by exporting RUBYLIB somehow
+    
+  2)
+  start your app using rdebug-ide:
+  rdebug-ide -J /tmp/test.rb
+
+  3) make vim connect to the debug server:
+  RDStart
+
+  4) eg set breakpoint using F9
+
+  5) start execution by
+  :RDCommand start
+  
+  6)step by F6 etc
+
+
+INSTALLATION:
+
+dependencies:
+  - see vim-addon-xdebug-addon-info.txt
+  - socat
+
+Using VAM:
+  add the name "vim-addon-ruby-debug-ide" to the list of plugins to be
+  installed.
+
+related work:
+=============
+https://github.com/astashov/vim-ruby-debugger
+So why did it start this project? I want maintainable minimal and reusable code.
+That's why this implementation is based on vim-addons-signs and vim-addon-async.
+The code in this repo is about 500 LOC currently, not 2000.
+
+It works nice and fast (but may crash vim sometimes), vim-ruby-debugger fails
+pointing to the current breakpoint when using this mapping and hitting hit a
+couple of times fast.
+  noremap <F6>  :call ruby_debugger#load_debugger() <bar> call g:RubyDebugger.step()<CR>
+The author told me it may happen occasionally - but did not for him. Well - I
+want to work fast.
+
+TODO / BUGS
+  - upload json protocol implementation for ruby-debug-ide19 to my github page (done)
+    and submit merge request when done (requested)
+  - check which features of implementation are missing
+  - test
+  - implemennt support for enabling / disabling breakpoints ?
+    (because lines in the breakpoint view can be commented this is not urgent)
