@@ -1,6 +1,8 @@
-Implement ruby-debug-ide client for Vim.
+Implement ruby-debug-ide19 client for Vim
 
-status: This is working:
+tested with ruby-1.9.2 (1.9.3 causes errors with ruby-debug19)
+
+STATUS: This is working:
 - stepping
 - breakpoints
 - var view and more stuff coming soon (help welcome)
@@ -9,30 +11,37 @@ USAGE:
   ! Requires client-server, thus X or patched Vim (eg nox patch, see vim-addon-async)
 
   1)
-  get this ruby-debug-ide19 code, branch json: 
-    https://github.com/MarcWeber/vim-addon-ruby-debug-ide
-  make ruby find it by exporting RUBYLIB somehow
-    
-  2)
-  start your app using rdebug-ide:
-  rdebug-ide -J /tmp/test.rb
+  # this installs ruby-debug19 and linecache19 as well:
+  gem install ruby-debug-ide19
 
-  3) make vim connect to the debug server:
-  RDStart
+  # get my patched version of ruby-debug-ide19
+  # I'm trying to feed these changes upstream
+  # thus the next two commands will not be needed in the future.
 
-  4) eg set breakpoint using F9
+  git clone -b json https://github.com/MarcWeber/ruby-debug-ide.git
 
-  5) start execution by
+  # make sure the files of my version are found first:
+  RUBYLIB=`pwd`/lib:$RUBYLIB
+
+  # start the debugger server, if my changes are accepted this will just be
+  # rdebug-ide -J ..
+  ruby bin/rdebug-ide -- -J /tmp/test.rb
+
+  2) make vim connect to the debug server:
+  :RDStart
+
+  set breakpoint using F9
+
+  4) start execution by
   :RDCommand start
   
-  6)step by F6 etc
-
+  6) step by F6 etc
 
 INSTALLATION:
 
 dependencies:
   - see addon-info.json
-  - socat
+  - socat executable (probably nc/netcat works as well)
 
 Using VAM:
   add the name "vim-addon-ruby-debug-ide" to the list of plugins to be
@@ -62,3 +71,9 @@ TODO / BUGS
   - test
   - implemennt support for enabling / disabling breakpoints ?
     (because lines in the breakpoint view can be commented this is not urgent)
+
+
+TROUBLE SHOOTING:
+
+invalid option: -J, you have the wrong ruby-debug-ide19 version which does not
+have my json protocl patch. See INSTALLATION.
