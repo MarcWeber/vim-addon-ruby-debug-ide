@@ -40,6 +40,9 @@ Using VAM:
 
 related work:
 =============
+github.com/MarcWeber/vim-addon-rdebug
+An implementation which works with require 'debug' only.
+
 https://github.com/astashov/vim-ruby-debugger
 So why did it start this project? I want maintainable minimal and reusable code.
 That's why this implementation is based on vim-addons-signs and vim-addon-async.

@@ -6,7 +6,7 @@
   "repository" : {"type": "git", "url": "git://github.com/MarcWeber/vim-addon-ruby-debug-ide.git"},
   "dependencies" : {
     "vim-addon-async": {},
-    "vim-addon-json": {},
+    "vim-addon-json-encoding": {},
     "vim-addon-mw-utils": {}
   },
   "description" : "quick & dirty ruby-debug-ide implementation - so that you can debug ruby in Vim efficiently"
