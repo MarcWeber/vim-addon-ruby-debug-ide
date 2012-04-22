@@ -51,6 +51,15 @@ fun! rdebug_ide#Start(...)
     if s:c.debugging
       call self.log(["socat died with code : ". self.status." restarting"])
     endif
+    for x in keys(s:c.ctx.execution_breakpoints)
+      let s:c.ctx.execution_breakpoints[x] = {}
+    endfor
+    for b in values(s:c.ctx.break_points)
+      silent! unlet b.no
+    endfor
+
+    call rdebug_ide#UpdateBreakpointSigns()
+    call rdebug_ide#UpdateExecutionBreakpointsSigns()
     if s:c.started
       " reuse same bufnr
       let s:c.started = 0
@@ -72,6 +81,9 @@ fun! rdebug_ide#Start(...)
 
   call async#Exec(ctx)
   call ctx.log(["socat started using cmd: ".ctx.cmd])
+
+  " try setting breakpoints:
+  call rdebug_ide#BreakPointsBuffer()
 
 endf
 
@@ -122,8 +134,6 @@ fun! rdebug_ide#HandleMessage(s) abort
       call rdebug_ide#AsyncMessage('TODO frame')
     elseif type == 'thread'
       call rdebug_ide#AsyncMessage('thread')
-    elseif type == 'variables'
-      call rdebug_ide#AsyncMessage('TODO variables')
 
     elseif type == "breakpointAdded"
       let id = j.file .':'. j.line
@@ -151,7 +161,7 @@ fun! rdebug_ide#HandleMessage(s) abort
 
     elseif type == "breakpoint"
       " breakpoint hit
-      call rdebug_ide#AsyncMessage('breakpoint hit: '.string(j))
+      call rdebug_ide#Async('echom '.string('breakpoint hit: '.string(j)))
     elseif type == "breakpointEnabled"
       call rdebug_ide#AsyncMessage('TODO breakpointEnabled')
     elseif type == "breakpointDisabled"
@@ -159,21 +169,28 @@ fun! rdebug_ide#HandleMessage(s) abort
     elseif type == "suspended"
       let ctx.execution_breakpoints[j.threadId] = j
       call rdebug_ide#UpdateExecutionBreakpointsSigns()
+    elseif type == "eval"
+      call buf_utils#GotoBuf('RDBUG_EVAL_RESULTS', {'create_cmd':'sp'})
+      call append(0, j.expression .'='. j.value)
+    elseif type == "error"
+      call rdebug_ide#AsyncMessage("ERROR: ". j.error)
+    elseif type == "variables"
+      call buf_utils#GotoBuf('RDBUG_VARIABLES', {'create_cmd':'sp'})
+      normal ggdG
+      for v in j.variables
+        call append('$', string(v))
+      endfor
       "conditionSet"
       "catchpointSet"
-      "eval"
       "print_pp"
       "methods"
       "breakpoint"
       "exception"
       "suspended"
       "processingException"
-      "variables"
     else
       call rdebug_ide#AsyncMessage('TODO '.type)
     endif
-
-
   else
     call rdebug_ide#AsyncMessage('bad json: dict expected')
   endif
@@ -386,14 +403,18 @@ fun! rdebug_ide#UpdateBreakpointSigns()
 endf
 
 fun! rdebug_ide#UpdateExecutionBreakpointsSigns()
-  for [k,j] in items(s:c.ctx.execution_breakpoints)
-    let k = 'did_sign_bp_'. j.threadId
-    let sig = 'rdebug_ide_current_line_'. j.threadId
+  for [threadId,j] in items(s:c.ctx.execution_breakpoints)
+    let k = 'did_sign_bp_'. threadId
+    let sig = 'rdebug_ide_current_line_'. threadId
     " if !has_key(s:c, k)
       let s:c[k] = 1
-      exec 'sign define '.sig.' text=>'. j.threadId.' linehl=Type'
+      exec 'sign define '.sig.' text=>'. threadId .' linehl=Type'
     " endif
-    call vim_addon_signs#Push(sig, [[bufnr(j.file), j.line, sig]] )
+    if empty(j)
+      call vim_addon_signs#Push(sig, [] )
+    else
+      call vim_addon_signs#Push(sig, [[bufnr(j.file), j.line, sig]] )
+    endif
     unlet k j
   endfor
 endf
