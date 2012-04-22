@@ -31,7 +31,7 @@ USAGE:
 INSTALLATION:
 
 dependencies:
-  - see vim-addon-xdebug-addon-info.txt
+  - see addon-info.json
   - socat
 
 Using VAM:
