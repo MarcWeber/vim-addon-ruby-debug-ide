@@ -54,7 +54,9 @@ fun! rdebug_ide#Start(...)
     if s:c.started
       " reuse same bufnr
       let s:c.started = 0
-      call rdebug_ide#Start({'log_bufnr' : self.log_bufnr})
+      if confirm('socat died, restart? y/[n]',"&yes\n[&N]o",2) == 'y'
+        call rdebug_ide#Start({'log_bufnr' : self.log_bufnr})
+      endif
     endif
   endf
 

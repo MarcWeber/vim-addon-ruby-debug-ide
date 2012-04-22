@@ -25,7 +25,7 @@ USAGE:
 
   # start the debugger server, if my changes are accepted this will just be
   # rdebug-ide -J ..
-  ruby bin/rdebug-ide -- -J /tmp/test.rb
+  ruby bin/rdebug-ide -J /tmp/test.rb
 
   2) make vim connect to the debug server:
   :RDStart
