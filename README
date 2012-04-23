@@ -15,23 +15,31 @@ USAGE:
   # this installs ruby-debug19 and linecache19 as well:
   gem install ruby-debug-ide19
 
-  # get my patched version of ruby-debug-ide19
-  # I'm trying to feed these changes upstream
-  # thus the next two commands will not be needed in the future.
+  
+  The following steps are only necessary until my changes are accepted
+  upstream.
 
-  git clone -b json https://github.com/MarcWeber/ruby-debug-ide.git
+    # get my patched version of ruby-debug-ide19
+    # I'm trying to feed these changes upstream
+    # thus the next two commands will not be needed in the future.
 
-  # make sure the files of my version are found first:
-  RUBYLIB=`pwd`/lib:$RUBYLIB
+    git clone -b json https://github.com/MarcWeber/ruby-debug-ide.git
 
-  # start the debugger server, if my changes are accepted this will just be
-  # rdebug-ide -J ..
-  ruby bin/rdebug-ide -J /tmp/test.rb
+    # make sure the files of my version are found first:
+    RUBYLIB=`pwd`/lib:$RUBYLIB
+    chmod +x bin/rdebug-ide
+    PATH=`pwd`/bin:$PATH
 
-  2) make vim connect to the debug server:
+  2) start Vim *after* having set PATH and RUBYLIB as shown above.
+  :e test.rb (your script to be debugged)
   :RDStart
+  You'll be asked for the script name to be debugged.
+  Keep empty to connect to already running rdebug-ide process.
+  You can start the server manually this way: rdebug-ide -J script.rb
 
   You can set breakpoints by F9 and add conditions in the RDEBUG_BREAK_POINTS_VIEW buffer
+  
+  Yes - there are some segfaults. Switching off syntax or using non gui vim may help
   
   3) hit F8 to start process
   
@@ -77,3 +85,5 @@ TROUBLE SHOOTING:
 
 invalid option: -J, you have the wrong ruby-debug-ide19 version which does not
 have my json protocl patch. See INSTALLATION.
+
+You can't set breakpoints? Make sure you pass -J (json protocol) to rdebug-ide

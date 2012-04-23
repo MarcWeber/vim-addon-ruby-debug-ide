@@ -3,6 +3,24 @@ let s:c.started = get(s:c,'started',0)
 
 let s:auto_watch_end = '== auto watch end =='
 
+" manage the debugger rdebug-ide process. These are called for you {{{1
+fun! rdebug_ide#StopDebugger()
+  if has_key(s:c, 'ctx_debugger')
+    if !has_key(s:c.ctx_debugger,'status')
+      call s:c.ctx_debugger.kill()
+    endif
+  endif
+endf
+
+" called by #Start below
+fun! rdebug_ide#StartDebugger(script)
+  call rdebug_ide#StopDebugger()
+  let cmd = substitute(s:c.rdebug_ide_cmd, '%', shellescape(a:script), '')
+  let s:c.ctx_debugger = async_porcelaine#LogToBuffer({'cmd': cmd,'buf_name': 'RDEBUGGER_SERVER'})
+endf
+" }}}
+
+" client process management, you should use these (we use socat by default to connect to the server via TCP/IP)
 fun! rdebug_ide#Stop()
   if !s:c.started
     throw "no ruby-debug debugging active. Can't stop!"
@@ -21,13 +39,23 @@ fun! rdebug_ide#Start(...)
   let override = a:0 > 0 ? a:1 : {}
   let opts = s:c.opts
 
+  let script = get(opts, 'script', '')
+  if script == '' && get(opts,'ask_script',1) 
+    let script = input('pass ruby script to start rdbebug-ide on standard port :', expand('%:p'))
+  endif
+  if script != ''
+    call rdebug_ide#StartDebugger(script)
+    echom "sleeping 2 secs TODO - continue async"
+    sleep 2
+  endif
+
   let s:c.log = []
 
   call extend(opts , override, "force")
 
   let ctx = {}
   let ctx.cmd = 'socat TCP:'.opts['host'].':'.opts['port'].' -'
-  let ctx.buf_name = 'RUBY_RDEBUG_PROCESS'
+  let ctx.buf_name = 'RDEBUG_CLIENT_SOCAT'
 
   " by thread id
   let ctx.execution_breakpoints = {}
@@ -73,6 +101,7 @@ fun! rdebug_ide#Start(...)
   " try setting breakpoints:
   call rdebug_ide#UpdateBreakPoints()
   call ctx.log('visually select new line "eval RUBY_VERSION", then <cr> to send such commands to the debugger')
+  call ctx.log('PRESS F8 to send the start command to the debugger server process!')
 endf
 
 fun! rdebug_ide#RubyBuffer(...)
@@ -90,6 +119,9 @@ fun! rdebug_ide#RubyBuffer(...)
     call rdebug_ide#UpdateExecutionBreakpointsSigns()
 
     call rdebug_ide#AsyncMessage('connection lost, socat died. Probably debug server finished')
+    " if we die also kill server process
+    call rdebug_ide#StopDebugger()
+    let s:c.started = 0
   endf
 
   call async_porcelaine#LogToBuffer(ctx)
