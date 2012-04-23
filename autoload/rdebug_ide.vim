@@ -1,6 +1,8 @@
 if !exists('g:rdebug_ide') | let g:rdebug_ide = {} | endif | let s:c = g:rdebug_ide
 let s:c.started = get(s:c,'started',0)
 
+let s:auto_watch_end = '== auto watch end =='
+
 fun! rdebug_ide#Stop()
   if !s:c.started
     throw "no ruby-debug debugging active. Can't stop!"
@@ -16,8 +18,6 @@ fun! rdebug_ide#Start(...)
     throw "debugging was already started. Stop it using RDStop first, please!"
   endif
   let s:c.started = 1
-  echom "switching syn off because Vim crashes when keeping it on ??"
-  " syn off
   let override = a:0 > 0 ? a:1 : {}
   let opts = s:c.opts
 
@@ -25,7 +25,9 @@ fun! rdebug_ide#Start(...)
 
   call extend(opts , override, "force")
 
-  let ctx = {'cmd' : 'socat TCP:'.opts['host'].':'.opts['port'].' -'}
+  let ctx = {}
+  let ctx.cmd = 'socat TCP:'.opts['host'].':'.opts['port'].' -'
+  let ctx.buf_name = 'RUBY_RDEBUG_PROCESS'
 
   " by thread id
   let ctx.execution_breakpoints = {}
@@ -33,24 +35,50 @@ fun! rdebug_ide#Start(...)
   let ctx.break_points = {}
 
   fun ctx.log(lines)
-    call async#DelayUntilNotDisturbing('rdebug-ide', {'delay-when': ['buf-invisible:'. self.log_bufnr, 'in-cmdbuf'], 'fun' : function('async#ExecInBuffer'), 'args':  [self.log_bufnr, function('append'), ['$',a:lines]]})
+    call async#DelayUntilNotDisturbing('rdebug-ide', {'delay-when': ['buf-invisible:'. self.bufnr, 'in-cmdbuf'], 'fun' : function('async#ExecInBuffer'), 'args':  [self.bufnr, function('append'), ['$',a:lines]]})
   endf
 
   let s:c.ctx = ctx
-  if !has_key(opts,'log_bufnr')
-    sp RDEBUG_SOCAT_PROCESS | enew
-    let ctx.log_bufnr = bufnr('%')
-  else
-    let ctx.log_bufnr = opts.log_bufnr
-  endif
   let ctx.pending = [""]
 
   let ctx.receive = function("rdebug_ide#Receive")
 
-  fun ctx.terminated()
-    if s:c.debugging
-      call self.log(["socat died with code : ". self.status." restarting"])
+  fun ctx.started()
+    call self.log(["socat pid :". self.pid])
+  endf
+
+  " send command using automatic unique id
+  fun ctx.send(cmd)
+    if a:cmd == "cont" 
+      if has_key(self, 'status')
+        " restart client connection to server
+        RDStop
+        RDStart
+        return
+      elseif !get(self, 'start_sent', 0)
+        " if socat is running but the ruby script has'nt started start it
+        call self.send('start')
+        let self.start_sent = 1
+        return
+      endif
     endif
+
+    call self.log('>'.a:cmd)
+    call self.write(a:cmd."\n")
+  endf
+
+  call rdebug_ide#RubyBuffer(ctx)
+  call ctx.log(["socat started using cmd: ".ctx.cmd])
+
+  " try setting breakpoints:
+  call rdebug_ide#UpdateBreakPoints()
+  call ctx.log('visually select new line "eval RUBY_VERSION", then <cr> to send such commands to the debugger')
+endf
+
+fun! rdebug_ide#RubyBuffer(...)
+  let ctx = a:0 > 0 ? a:1 : {}
+
+  fun ctx.terminated()
     for x in keys(s:c.ctx.execution_breakpoints)
       let s:c.ctx.execution_breakpoints[x] = {}
     endfor
@@ -60,32 +88,15 @@ fun! rdebug_ide#Start(...)
 
     call rdebug_ide#UpdateBreakpointSigns()
     call rdebug_ide#UpdateExecutionBreakpointsSigns()
-    if s:c.started
-      " reuse same bufnr
-      let s:c.started = 0
-      if confirm('socat died, restart? y/[n]',"&yes\n[&N]o",2) == 'y'
-        call rdebug_ide#Start({'log_bufnr' : self.log_bufnr})
-      endif
-    endif
+
+    call rdebug_ide#AsyncMessage('connection lost, socat died. Probably debug server finished')
   endf
 
-  fun ctx.started()
-    call self.log(["socat pid :". self.pid])
-  endf
-
-  " send command using automatic unique id
-  fun ctx.send(cmd)
-    call self.log('>'.a:cmd)
-    call self.write(a:cmd."\n")
-  endf
-
-  call async#Exec(ctx)
-  call ctx.log(["socat started using cmd: ".ctx.cmd])
-
-  " try setting breakpoints:
-  call rdebug_ide#BreakPointsBuffer()
-
+  call async_porcelaine#LogToBuffer(ctx)
+  let ctx.receive = function('rdebug_ide#Receive')
+  return ctx
 endf
+
 
 fun! rdebug_ide#Receive(...) dict
   call call(function('rdebug_ide#Receive2'), a:000, self)
@@ -118,6 +129,18 @@ fun! rdebug_ide#AsyncMessage(s)
   call rdebug_ide#Async('echoe '.string(a:s))
 endf
 
+
+fun! rdebug_ide#SetPos(j)
+  let ctx = s:c.ctx
+  let ctx.execution_breakpoints[a:j.threadId] = a:j
+  call rdebug_ide#UpdateExecutionBreakpointsSigns()
+  call rdebug_ide#UpdateEvalView()
+
+  " jump to line:
+  call buf_utils#GotoBuf(a:j.file, {'create_cmd': 'sp'})
+  exec a:j.line
+endf
+
 fun! rdebug_ide#HandleMessage(s) abort
   let j = json#decode(a:s)
   let debugView = []
@@ -129,7 +152,7 @@ fun! rdebug_ide#HandleMessage(s) abort
   if type(j) == type({})
     let type = get(j, 'type', '')
     if type == 'message'
-      call rdebug_ide#AsyncMessage('ruby-debug message: '.get(j,'message','').' '.get(j,'xdebug',''))
+      call rdebug_ide#AsyncMessage('ruby-debug message: '.get(j,'message','').' '.get(j,'debug',''))
     elseif type == 'frame'
       call rdebug_ide#AsyncMessage('TODO frame')
     elseif type == 'thread'
@@ -161,17 +184,24 @@ fun! rdebug_ide#HandleMessage(s) abort
 
     elseif type == "breakpoint"
       " breakpoint hit
-      call rdebug_ide#Async('echom '.string('breakpoint hit: '.string(j)))
+      call rdebug_ide#SetPos(j)
+      " call rdebug_ide#Async('echom '.string('breakpoint hit: '.string(j)))
     elseif type == "breakpointEnabled"
       call rdebug_ide#AsyncMessage('TODO breakpointEnabled')
     elseif type == "breakpointDisabled"
       call rdebug_ide#AsyncMessage('TODO breakpointDisabled')
     elseif type == "suspended"
-      let ctx.execution_breakpoints[j.threadId] = j
-      call rdebug_ide#UpdateExecutionBreakpointsSigns()
+      call rdebug_ide#SetPos(j)
     elseif type == "eval"
-      call buf_utils#GotoBuf('RDBUG_EVAL_RESULTS', {'create_cmd':'sp'})
-      call append(0, j.expression .'='. j.value)
+      call rdebug_ide#EvalView()
+      let line = search('^watch\s\+'.escape(j.expression, '$%\'),'w', s:auto_watch_end)
+      if line == 0
+        " no watch, append last in buf
+        call append('$', j.expression .'='. j.value)
+      else
+        call append(line, '|  '.j.value)
+      endif
+      normal gg
     elseif type == "error"
       call rdebug_ide#AsyncMessage("ERROR: ". j.error)
     elseif type == "variables"
@@ -306,46 +336,46 @@ fun! rdebug_ide#UpdateBreakPoints()
   let ctx = s:c.ctx
   let c_bs = ctx.break_points
 
-  if !has_key(ctx,'status')
-    " for active processes update breakpoints
-
-    " remove dropped breakpoints
-    for c_b in values(c_bs)
-      if !has_key(points, c_b.key)
-        let c_b.active = 0
-        if has_key(c_b, 'no')
-          call ctx.send('delete '. c_b.no)
-        else
-          " if it does not have a number we have to delete it as soon as we
-          " receive the number ..
-          let c_b.delete_when_receiving_no += 1
-        endif
-      endif
-    endfor
-
-    " add new breakpoints
-    for b in values(points)
-      if !has_key(c_bs, b.key)
-        " new breakpoint
-        let b.delete_when_receiving_no = 0
-        let b.active = 1
-        let c_bs[b.key] = b
-        " create, no will be received async
-        call ctx.send('break '. b.s)
+  " remove dropped breakpoints
+  for c_b in values(c_bs)
+    if !has_key(points, c_b.key)
+      let c_b.active = 0
+      if has_key(c_b, 'no')
+        call ctx.send('delete '. c_b.no)
       else
-        " this breakpaint was used before, check status
-        let b = c_bs[b.key]
-        let b.active = 1
-        if b.delete_when_receiving_no > 0
-          " no longer delete on request
-          let b.delete_when_receiving_no -= 1
-        else
-          " create, no will be received async
+        " if it does not have a number we have to delete it as soon as we
+        " receive the number ..
+        let c_b.delete_when_receiving_no += 1
+      endif
+    endif
+  endfor
+
+  " add new breakpoints
+  for b in values(points)
+    if !has_key(c_bs, b.key)
+      " new breakpoint
+      let b.delete_when_receiving_no = 0
+      let b.active = 1
+      let c_bs[b.key] = b
+      " create, no will be received async
+      if !has_key(ctx,'status')
+        call ctx.send('break '. b.s)
+      endif
+    else
+      " this breakpaint was used before, check status
+      let b = c_bs[b.key]
+      let b.active = 1
+      if b.delete_when_receiving_no > 0
+        " no longer delete on request
+        let b.delete_when_receiving_no -= 1
+      else
+        " create, no will be received async
+        if !has_key(ctx,'status')
           call ctx.send('break '. b.s)
         endif
       endif
-    endfor
-  endif
+    endif
+  endfor
   call rdebug_ide#UpdateBreakpointSigns()
 endf
 
@@ -359,11 +389,14 @@ fun! rdebug_ide#BreakPointsBuffer()
     let s:c.var_break_buf_nr = bufnr('%')
     noremap <buffer> <cr> :call rdebug_ide#UpdateBreakPoints()<cr>
     call append(0,['# put the breakpoints here, prefix with # to deactivate:', s:auto_break_end
-          \ , 'rdebug supports different types of breakpoints:'
-          \ , '[file:|class:]<line|method>'
-          \ , '[class.]<line|method>'
-          \ , 'you always have to add the file / class in Vim'
+          \ , 'rdebug supports different types of breakpoints,'
+          \ , 'but only "file:line [if cond]" has been tested'
           \ , 'hit <cr> to send updated breakpoints to processes'
+          \ , ''
+          \ , 'sign description:'
+          \ , 'O = active breakpoint'
+          \ , 'O< = to be activated breakpoint'
+          \ , 'O> = active, but removing this breakpoint'
           \ ])
     setlocal noswapfile
     " it may make sense storing breakpoints. So allow writing the breakpoints
@@ -416,5 +449,56 @@ fun! rdebug_ide#UpdateExecutionBreakpointsSigns()
       call vim_addon_signs#Push(sig, [[bufnr(j.file), j.line, sig]] )
     endif
     unlet k j
+  endfor
+endf
+
+fun! rdebug_ide#UpdateEvalView()
+  let win_nr = bufwinnr(get(s:c, 'var_view_buf_nr', -1))
+  " only update view if buffer is visible (for speed reasons
+  if win_nr == -1 | return | endif
+  let old_win_nr = winnr()
+  exec win_nr.' wincmd w'
+
+  for l in getline('0',line('$'))
+    if l =~ s:auto_watch_end | break | endif
+    let watch_expr = matchstr(l, '^watch\s\+\zs.*\ze')
+    if watch_expr != ''
+      call s:c.ctx.send("eval ".watch_expr)
+    endif
+  endfor
+  let curr_buf = bufnr('%')
+
+  normal gg
+  let end = search(s:auto_watch_end,'')
+  exec 1.','.end.':g/'.'^|  '.'/d'
+  exec old_win_nr.' wincmd w'
+endf
+
+" creates / shows the var view buffer.
+fun! rdebug_ide#EvalView()
+  let buf_name = "RDEBUG_EVAL_VIEW"
+  let cmd = buf_utils#GotoBuf(buf_name, {'create_cmd': 'sp'} )
+  if cmd == 'e'
+    " new buffer, set commands etc
+    let s:c.var_view_buf_nr = bufnr('%')
+    au BufWinEnter <buffer> call rdebug_ide#UpdateEvalView()
+    command -buffer UpdateWatchView call rdebug_ide#UpdateEvalView()
+    vnoremap <buffer> <cr> y:call rdebug_ide#SendVisuallySelectedLines()<cr>
+    call append(0,['watch RUBY_VERSION', s:auto_watch_end
+          \ , 'This text here will not be touched. You can eval Ruby by typing, visually selecting and pressing <cr>'
+          \ ])
+    set buftype=nofile
+  endif
+
+  let buf_nr = bufnr(buf_name)
+  if buf_nr == -1
+    exec 'sp '.fnameescape(buf_name)
+  endif
+endf
+
+fun! rdebug_ide#SendVisuallySelectedLines()
+  " must send lines individually
+  for x in split(getreg('"'),"\n")
+    let g:rdebug_ide.ctx.send('eval '.x)
   endfor
 endf

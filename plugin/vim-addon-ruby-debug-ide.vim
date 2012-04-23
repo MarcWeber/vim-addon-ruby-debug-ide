@@ -33,7 +33,9 @@ if !exists('*RDMappings')
      noremap <F9> :call rdebug_ide#ToggleLineBreakpoint()<cr>
      " noremap \xv :RDVarView<cr>
      " vnoremap \xv y:RDVarView<cr>GpV<cr>
-     command -nargs=* RDCommand :call g:rdebug_ide.ctx.send(join([<f-args>]," "))
+     command! -nargs=* RDCommand :call g:rdebug_ide.ctx.send(join([<f-args>]," "))
+     " custom watch expressions, eval result view:
+     command! -nargs=0 RDEvalView :call rdebug_ide#EvalView()<cr>
 
 " TODO implement these commands in some way
 "      class AddBreakpoint < Command # :nodoc:

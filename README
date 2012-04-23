@@ -5,7 +5,8 @@ tested with ruby-1.9.2 (1.9.3 causes errors with ruby-debug19)
 STATUS: This is working:
 - stepping
 - breakpoints
-- var view and more stuff coming soon (help welcome)
+- var view, watching, evaling, sending commands to debug process manually
+- restarting
 
 USAGE:
   ! Requires client-server, thus X or patched Vim (eg nox patch, see vim-addon-async)
@@ -30,12 +31,11 @@ USAGE:
   2) make vim connect to the debug server:
   :RDStart
 
-  set breakpoint using F9
-
-  4) start execution by
-  :RDCommand start
+  You can set breakpoints by F9 and add conditions in the RDEBUG_BREAK_POINTS_VIEW buffer
   
-  6) step by F6 etc
+  3) hit F8 to start process
+  
+  6) step by F6 etc, see plugin/vim-addon-ruby-debug-ide.vim fun RDMappings
 
 INSTALLATION:
 
