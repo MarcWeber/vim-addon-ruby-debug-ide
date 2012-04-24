@@ -89,6 +89,13 @@ fun! rdebug_ide#Start(...)
         let self.start_sent = 1
         return
       endif
+
+      " remove suspneded marker
+      " TODO / FIXME: what  happens if multiple threads are being used? ..
+      for x in keys(s:c.ctx.execution_breakpoints)
+        let s:c.ctx.execution_breakpoints[x] = {}
+      endfor
+      call rdebug_ide#UpdateExecutionBreakpointsSigns()
     endif
 
     call self.log('>'.a:cmd)

@@ -81,9 +81,10 @@ TODO / BUGS
   - upload json protocol implementation for ruby-debug-ide19 to my github page (done)
     and submit merge request when done (requested)
   - check which features of implementation are missing
-  - test
+    thread support (continue which one when hitting F8?)
   - implemennt support for enabling / disabling breakpoints ?
     (because lines in the breakpoint view can be commented this is not urgent)
+  - somewhen fix the segfault which sometimes occurs in Vim
 
 
 TROUBLE SHOOTING:
