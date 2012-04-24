@@ -1,13 +1,10 @@
 if !exists('g:rdebug_ide') | let g:rdebug_ide = {} | endif | let s:c = g:rdebug_ide
 
 let s:c.rdebug_ide_cmd = get(s:c, 'rdebug_ide_cmd', 'rdebug-ide -J %')
+let s:c.opts = get(s:c,'opts',{'port': '1234', 'host': 'localhost'})
 
 command! -bar -nargs=0 RDStart call RDMappings() | call rdebug_ide#Start()
 command! -bar -nargs=0 RDStop  call rdebug_ide#Stop()
-
-sign define rdebug_ide_breakpoint_activating text=O<   linehl=
-sign define rdebug_ide_breakpoint_deleting   text=O>   linehl=
-sign define rdebug_ide_breakpoint_active     text=O    linehl=
 
 if !exists('*RDMappings')
   fun! RDMappings()
@@ -64,4 +61,6 @@ if !exists('*RDMappings')
   endf
 endif
 
-let s:c.opts = get(s:c,'opts',{'port': '1234', 'host': 'localhost'})
+sign define rdebug_ide_breakpoint_activating text=O<   linehl=
+sign define rdebug_ide_breakpoint_deleting   text=O>   linehl=
+sign define rdebug_ide_breakpoint_active     text=O    linehl=

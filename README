@@ -72,6 +72,11 @@ couple of times fast.
 The author told me it may happen occasionally - but did not for him. Well - I
 want to work fast.
 
+There are some more debugger script at www.vim.org which work with any
+commandline related debugger or can be extended to work with those.
+I haven't tried them. Example:
+http://www.vim.org/scripts/script.php?script_id=1703
+
 TODO / BUGS
   - upload json protocol implementation for ruby-debug-ide19 to my github page (done)
     and submit merge request when done (requested)
