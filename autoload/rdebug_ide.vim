@@ -90,6 +90,10 @@ fun! rdebug_ide#Start(...)
         return
       endif
 
+    endif
+
+
+    if a:cmd =~ '^\%(cont\|next\)'
       " remove suspneded marker
       " TODO / FIXME: what  happens if multiple threads are being used? ..
       for x in keys(s:c.ctx.execution_breakpoints)
@@ -172,12 +176,13 @@ endf
 fun! rdebug_ide#SetPos(j)
   let ctx = s:c.ctx
   let ctx.execution_breakpoints[a:j.threadId] = a:j
-  call rdebug_ide#UpdateExecutionBreakpointsSigns()
-  call rdebug_ide#UpdateEvalView()
 
   " jump to line:
   call buf_utils#GotoBuf(a:j.file, {'create_cmd': 'sp'})
   exec a:j.line
+
+  call rdebug_ide#UpdateExecutionBreakpointsSigns()
+  call rdebug_ide#UpdateEvalView()
 endf
 
 fun! rdebug_ide#HandleMessage(s) abort
@@ -192,11 +197,19 @@ fun! rdebug_ide#HandleMessage(s) abort
     let type = get(j, 'type', '')
     if type == 'message'
       call rdebug_ide#AsyncMessage('ruby-debug message: '.get(j,'message','').' '.get(j,'debug',''))
-    elseif type == 'frame'
-      call rdebug_ide#AsyncMessage('TODO frame')
-    elseif type == 'thread'
-      call rdebug_ide#AsyncMessage('thread')
-
+    elseif type == 'frames'
+      " TODO current thread vs thread id?
+      let qf_list = []
+      for f in j.frames
+        call add(qf_list, {'filename': f.file, 'lnum': f.line, 'text' : f.type.' '.f.no})
+      endfor
+      call setqflist(qf_list)
+    elseif type == 'threads'
+      call buf_utils#GotoBuf('RDBUG_THREADS', {'create_cmd':'sp'})
+      normal ggdG
+      for t in j.threads
+        call append('$', 'thread:'. t.id .':'. t.status)
+      endfor
     elseif type == "breakpointAdded"
       let id = j.file .':'. j.line
       let c_bs = s:c.ctx.break_points

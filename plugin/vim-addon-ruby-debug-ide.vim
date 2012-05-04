@@ -8,12 +8,18 @@ command! -bar -nargs=0 RDStop  call rdebug_ide#Stop()
 
 if !exists('*RDMappings')
   fun! RDMappings()
+    " the code of ruby-debug-ide describes what each command does exactly
+
+    " show call trace
+     noremap <F3> :call g:rdebug_ide.ctx.send('where')<cr>
+
      " step into
      noremap <F5> :call g:rdebug_ide.ctx.send('step')<cr>
      " next command same level
      noremap <F6> :call g:rdebug_ide.ctx.send('next')<cr>
      " step out
      noremap <F7> :call g:rdebug_ide.ctx.send('finish')<cr>
+     " continue
      noremap <F8> :call g:rdebug_ide.ctx.send('cont')<cr>
      noremap <F9> :call rdebug_ide#ToggleLineBreakpoint()<cr>
      " noremap \xv :RDVarView<cr>

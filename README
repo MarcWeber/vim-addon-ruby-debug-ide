@@ -39,7 +39,8 @@ USAGE:
 
   You can set breakpoints by F9 and add conditions in the RDEBUG_BREAK_POINTS_VIEW buffer
   
-  Yes - there are some segfaults. Switching off syntax or using non gui vim may help
+  Yes - there are some segfaults sometimes. Using latest mercurial dev version
+  of Vim seems to fix most issues?
   
   3) hit F8 to start process
   
